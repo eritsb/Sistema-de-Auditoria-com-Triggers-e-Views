@@ -1,4 +1,4 @@
-# Sistema-de-Auditoria-com-Triggers-e-Views
+#  Sistema de Auditoria com Triggers e Views
 
 > Documentação técnica de um sistema de auditoria de banco de dados desenvolvido em MySQL, utilizando Triggers e Views para garantir rastreabilidade, integridade e transparência das operações.
 
@@ -23,8 +23,8 @@
 - [Estrutura do Banco de Dados](#estrutura-do-banco-de-dados)
 - [Triggers de Auditoria](#triggers-de-auditoria)
 - [Views](#views)
-- [Exemplos de Uso](#exemplos-de-uso)
 - [Testes Realizados](#testes-realizados)
+- [Exemplo de Uso Completo](#exemplo-de-uso-completo)
 - [Como Executar](#como-executar)
 
 ---
@@ -42,8 +42,7 @@ Em ambientes que exigem controle rigoroso sobre os dados — como sistemas finan
 -  Garantir conformidade com normas e regulamentações (LGPD, por exemplo)
 -  Investigar incidentes de segurança ou erros operacionais
 -  Manter um histórico confiável de todas as transações realizadas
-
- Facilitar auditorias externas e relatórios de gestão
+-  Facilitar auditorias externas e relatórios de gestão
 
 ### Recursos Aplicados
 
@@ -56,7 +55,7 @@ Em ambientes que exigem controle rigoroso sobre os dados — como sistemas finan
 
 ## Diagrama ER
 
-O banco de dados `bd_auditoria` é composto por **cinco tabelas principais**, conforme o diagrama abaixo:
+O banco de dados `bd_auditoria` é composto por **cinco tabelas principais**:
 <img width="600" height="380" alt="Diagrama ER" src="https://github.com/user-attachments/assets/903d3c08-ba8a-4fba-abdc-dcce3f82c05c" />
 ```
 clientes ──(1:N)──> vendas ──(1:N)──> itens_venda <──(1:N)── produtos
@@ -78,8 +77,6 @@ clientes ──(1:N)──> vendas ──(1:N)──> itens_venda <──(1:N)�
 
 ### Tabela `clientes`
 
-Armazena as informações dos clientes cadastrados no sistema.
-
 | Coluna | Tipo | Descrição |
 |--------|------|-----------|
 | `id_cliente` | INT, PK, AUTO_INCREMENT | Identificador único |
@@ -88,352 +85,302 @@ Armazena as informações dos clientes cadastrados no sistema.
 | `email` | VARCHAR(100) | E-mail |
 | `telefone` | VARCHAR(20) | Contato |
 | `data_cadastro` | DATETIME | Data do cadastro (automático) |
-| `status` | VARCHAR(20) | Situação (`ativo` / `inativo`) |
+| `status` | VARCHAR(20) | `ativo` / `inativo` |
 
 ### Tabela `produtos`
 
-Armazena os produtos disponíveis para venda.
-
 | Coluna | Tipo | Descrição |
 |--------|------|-----------|
-| `id_produto` | INT, PK | Identificador |
+| `id_produto` | INT, PK, AUTO_INCREMENT | Identificador |
 | `nome` | VARCHAR(100) | Nome do produto |
 | `descricao` | TEXT | Descrição |
 | `preco` | DECIMAL(10,2) | Valor |
 | `estoque` | INT | Quantidade disponível |
-| `data_cadastro` | DATETIME | Data de cadastro |
+| `data_cadastro` | DATETIME | Data de cadastro (automático) |
 | `status` | VARCHAR(20) | Situação |
 
 ### Tabela `vendas`
 
-Registra as vendas realizadas no sistema.
-
 | Coluna | Tipo | Descrição |
 |--------|------|-----------|
-| `id_venda` | INT, PK | Identificador |
-| `id_cliente` | INT, FK | Cliente da compra |
-| `data_venda` | DATETIME | Data da venda |
-| `valor_total` | DECIMAL | Valor total |
-| `status` | VARCHAR(20) | `concluída` / `cancelada` |
+| `id_venda` | INT, PK, AUTO_INCREMENT | Identificador |
+| `id_cliente` | INT, FK | Referência ao cliente |
+| `data_venda` | DATETIME | Data da venda (automático) |
+| `valor_total` | DECIMAL(10,2) | Valor total |
+| `status` | VARCHAR(20) | `finalizada` / `cancelada` |
 
 ### Tabela `itens_venda`
 
-Detalha os produtos de cada venda.
-
 | Coluna | Tipo | Descrição |
 |--------|------|-----------|
-| `id_item` | INT, PK | Identificador |
+| `id_item` | INT, PK, AUTO_INCREMENT | Identificador |
 | `id_venda` | INT, FK | Referência à venda |
 | `id_produto` | INT, FK | Referência ao produto |
 | `quantidade` | INT | Quantidade vendida |
-| `preco_unitario` | DECIMAL | Preço no momento da venda |
+| `preco_unitario` | DECIMAL(10,2) | Preço no momento da venda |
 
 ### Tabela `auditoria`
 
-Registra automaticamente todas as alterações feitas no sistema via Triggers.
-
 | Coluna | Tipo | Descrição |
 |--------|------|-----------|
-| `id_auditoria` | INT, PK | Identificador |
+| `id_auditoria` | INT, PK, AUTO_INCREMENT | Identificador |
 | `tabela_afetada` | VARCHAR(50) | Nome da tabela modificada |
-| `operacao` | VARCHAR | `INSERT`, `UPDATE` ou `DELETE` |
+| `operacao` | ENUM | `INSERT`, `UPDATE` ou `DELETE` |
 | `id_registro` | INT | ID do registro afetado |
 | `valor_antigo` | JSON | Dados antes da operação |
 | `valor_novo` | JSON | Dados após a operação |
 | `usuario` | VARCHAR(100) | Usuário responsável |
-| `data_operacao` | TIMESTAMP | Data e hora da operação |
+| `data_operacao` | TIMESTAMP | Data e hora da operação (automático) |
 
 ---
 
 ## Triggers de Auditoria
 
-As Triggers são executadas **automaticamente** após operações nas tabelas, sem necessidade de intervenção manual.
-
-### `trg_clientes_insert`
-
-Disparada após um `INSERT` em `clientes`. Registra os dados novos no campo `valor_novo`.
-
-```sql
--- Exemplo de operação
-INSERT INTO clientes (nome, cpf, email, telefone, status)
-VALUES ('Mariah', '123.456.789-00', 'mariah@email.com', '99999-9999', 'ativo');
-```
-
-**Auditoria registra:** operação `INSERT` com todos os dados em `valor_novo`.
-
----
-
-### `trg_clientes_update`
-
-Disparada após `UPDATE` em `clientes`. Salva os valores **antes** (`OLD`) e **depois** (`NEW`).
-
-```sql
--- Exemplo de operação
-UPDATE clientes
-SET nome = 'Maria Silva'
-WHERE id_cliente = 1;
-```
-
-**Auditoria registra:**
-- `valor_antigo`: `{"nome": "Maria"}`
-- `valor_novo`: `{"nome": "Maria Silva"}`
-
----
-
-### `trg_clientes_delete`
-
-Disparada após `DELETE` em `clientes`. Salva apenas os dados anteriores à exclusão.
-
-```sql
--- Exemplo de operação
-DELETE FROM clientes WHERE id_cliente = 1;
-```
-
-**Auditoria registra:** todos os dados do cliente excluído em `valor_antigo`.
-
----
-
-### `trg_produtos_update`
-
-Disparada após `UPDATE` em `produtos`. Guarda os valores de antes e depois da alteração (incluindo preço, estoque e status).
-
----
-
-### `trg_vendas_insert`
-
-Disparada após `INSERT` em `vendas`. Registra os dados da nova venda criada.
-
----
-
-### Resumo das Triggers
+Cobertura completa de todas as tabelas monitoradas:
 
 | Trigger | Tabela | Evento | O que registra |
 |---------|--------|--------|----------------|
-| `trg_clientes_insert` | `clientes` | INSERT | Novos dados do cliente |
-| `trg_clientes_update` | `clientes` | UPDATE | Antes e depois da alteração |
-| `trg_clientes_delete` | `clientes` | DELETE | Dados antes da exclusão |
-| `trg_produtos_update` | `produtos` | UPDATE | Antes e depois da alteração |
-| `trg_vendas_insert` | `vendas` | INSERT | Dados da nova venda |
+| `trg_clientes_insert` | `clientes` | INSERT | Novos dados do cliente em `valor_novo` |
+| `trg_clientes_update` | `clientes` | UPDATE | Antes em `valor_antigo`, depois em `valor_novo` |
+| `trg_clientes_delete` | `clientes` | DELETE | Dados removidos em `valor_antigo` |
+| `trg_produtos_insert` | `produtos` | INSERT | Novos dados do produto em `valor_novo` |
+| `trg_produtos_update` | `produtos` | UPDATE | Antes em `valor_antigo`, depois em `valor_novo` |
+| `trg_vendas_insert` | `vendas` | INSERT | Dados da nova venda em `valor_novo` |
+
+### `trg_clientes_insert`
+
+```sql
+CREATE TRIGGER trg_clientes_insert
+AFTER INSERT ON clientes
+FOR EACH ROW
+BEGIN
+    INSERT INTO auditoria (tabela_afetada, operacao, id_registro, valor_novo, usuario)
+    VALUES (
+        'clientes', 'INSERT', NEW.id_cliente,
+        JSON_OBJECT(
+            'nome', NEW.nome, 'cpf', NEW.cpf,
+            'email', NEW.email, 'telefone', NEW.telefone,
+            'status', NEW.status, 'data_cadastro', NEW.data_cadastro
+        ),
+        CURRENT_USER()
+    );
+END$$
+```
+
+### `trg_clientes_update`
+
+```sql
+CREATE TRIGGER trg_clientes_update
+AFTER UPDATE ON clientes
+FOR EACH ROW
+BEGIN
+    INSERT INTO auditoria (tabela_afetada, operacao, id_registro, valor_antigo, valor_novo, usuario)
+    VALUES (
+        'clientes', 'UPDATE', NEW.id_cliente,
+        JSON_OBJECT('nome', OLD.nome, 'cpf', OLD.cpf, 'email', OLD.email,
+                    'telefone', OLD.telefone, 'status', OLD.status),
+        JSON_OBJECT('nome', NEW.nome, 'cpf', NEW.cpf, 'email', NEW.email,
+                    'telefone', NEW.telefone, 'status', NEW.status),
+        CURRENT_USER()
+    );
+END$$
+```
+
+### `trg_clientes_delete`
+
+```sql
+CREATE TRIGGER trg_clientes_delete
+AFTER DELETE ON clientes
+FOR EACH ROW
+BEGIN
+    INSERT INTO auditoria (tabela_afetada, operacao, id_registro, valor_antigo, usuario)
+    VALUES (
+        'clientes', 'DELETE', OLD.id_cliente,
+        JSON_OBJECT('nome', OLD.nome, 'cpf', OLD.cpf, 'email', OLD.email,
+                    'telefone', OLD.telefone, 'status', OLD.status),
+        CURRENT_USER()
+    );
+END$$
+```
+
+### `trg_produtos_insert`
+
+```sql
+CREATE TRIGGER trg_produtos_insert
+AFTER INSERT ON produtos
+FOR EACH ROW
+BEGIN
+    INSERT INTO auditoria (tabela_afetada, operacao, id_registro, valor_novo, usuario)
+    VALUES (
+        'produtos', 'INSERT', NEW.id_produto,
+        JSON_OBJECT(
+            'nome', NEW.nome, 'descricao', NEW.descricao,
+            'preco', NEW.preco, 'estoque', NEW.estoque, 'status', NEW.status
+        ),
+        CURRENT_USER()
+    );
+END$$
+```
+
+### `trg_produtos_update`
+
+```sql
+CREATE TRIGGER trg_produtos_update
+AFTER UPDATE ON produtos
+FOR EACH ROW
+BEGIN
+    INSERT INTO auditoria (tabela_afetada, operacao, id_registro, valor_antigo, valor_novo, usuario)
+    VALUES (
+        'produtos', 'UPDATE', NEW.id_produto,
+        JSON_OBJECT('nome', OLD.nome, 'preco', OLD.preco,
+                    'estoque', OLD.estoque, 'status', OLD.status),
+        JSON_OBJECT('nome', NEW.nome, 'preco', NEW.preco,
+                    'estoque', NEW.estoque, 'status', NEW.status),
+        CURRENT_USER()
+    );
+END$$
+```
+
+### `trg_vendas_insert`
+
+```sql
+CREATE TRIGGER trg_vendas_insert
+AFTER INSERT ON vendas
+FOR EACH ROW
+BEGIN
+    INSERT INTO auditoria (tabela_afetada, operacao, id_registro, valor_novo, usuario)
+    VALUES (
+        'vendas', 'INSERT', NEW.id_venda,
+        JSON_OBJECT(
+            'id_cliente', NEW.id_cliente, 'valor_total', NEW.valor_total,
+            'status', NEW.status, 'data_venda', NEW.data_venda
+        ),
+        CURRENT_USER()
+    );
+END$$
+```
 
 ---
 
 ## Views
 
-As Views foram criadas para facilitar consultas, organizando os dados de forma mais simples e reutilizável.
-
-### `vw_clientes_ativos`
-
-Exibe apenas os clientes com status `ativo`.
-
-```sql
-CREATE VIEW vw_clientes_ativos AS
-SELECT id_cliente, nome, cpf, email, telefone, data_cadastro
-FROM clientes
-WHERE status = 'ativo';
-```
-
-**Exemplo de resultado:**
-
-| id_cliente | nome | email |
-|------------|------|-------|
-| 1 | Mariah | mariah@email.com |
-
----
-
-### `vw_produtos_disponiveis`
-
-Mostra apenas produtos ativos e com estoque maior que zero.
+| View | Descrição |
+|------|-----------|
+| `vw_clientes_ativos` | Lista clientes com `status = 'ativo'` |
+| `vw_produtos_disponiveis` | Lista produtos ativos com estoque maior que zero |
+| `vw_vendas_clientes` | Une vendas com o nome do cliente via JOIN |
+| `vw_itens_venda_detalhada` | Detalha itens com nome do produto e subtotal calculado |
+| `vw_auditoria_resumida` | Log de auditoria sem os campos JSON |
 
 ```sql
-CREATE VIEW vw_produtos_disponiveis AS
-SELECT id_produto, nome, descricao, preco, estoque
-FROM produtos
-WHERE status = 'ativo' AND estoque > 0;
-```
-
-**Exemplo de resultado:**
-
-| id_produto | nome | estoque |
-|------------|------|---------|
-| 1 | Camiseta | 18 |
-| 2 | Calça | 14 |
-
----
-
-### `vw_vendas_clientes`
-
-Exibe as vendas junto com o nome do cliente.
-
-```sql
-CREATE VIEW vw_vendas_clientes AS
-SELECT v.id_venda, c.nome AS nome_cliente, v.data_venda, v.valor_total, v.status
-FROM vendas v
-INNER JOIN clientes c ON v.id_cliente = c.id_cliente;
-```
-
-**Exemplo de resultado:**
-
-| id_venda | nome_cliente | valor_total | status |
-|----------|-------------|-------------|--------|
-| 10 | Mariah | 180.00 | finalizada |
-
----
-
-### `vw_itens_venda_detalhada`
-
-Detalha os produtos vendidos em cada venda, incluindo subtotal calculado.
-
-```sql
-CREATE VIEW vw_itens_venda_detalhada AS
-SELECT iv.id_item, iv.id_venda, p.nome AS produto,
-       iv.quantidade, iv.preco_unitario,
-       (iv.quantidade * iv.preco_unitario) AS subtotal
-FROM itens_venda iv
-INNER JOIN produtos p ON iv.id_produto = p.id_produto;
-```
-
-**Exemplo de resultado:**
-
-| id_venda | produto | quantidade | subtotal |
-|----------|---------|------------|----------|
-| 10 | Camiseta | 2 | 100.00 |
-| 10 | Calça | 1 | 80.00 |
-
----
-
-### `vw_auditoria_resumida`
-
-Apresenta um resumo das operações registradas na auditoria, sem os campos JSON.
-
-```sql
-CREATE VIEW vw_auditoria_resumida AS
-SELECT id_auditoria, tabela_afetada, operacao,
-       id_registro, usuario, data_operacao
-FROM auditoria;
-```
-
-**Exemplo de resultado:**
-
-| id_auditoria | tabela_afetada | operacao | data_operacao |
-|--------------|---------------|----------|---------------|
-| 1 | vendas | INSERT | 2026-01-01 10:00:00 |
-| 2 | produtos | UPDATE | 2026-01-01 10:05:00 |
-
----
-
-## Exemplos de Uso
-
-### Cenário: Compra em uma loja
-
-A cliente **Mariah** realiza uma compra contendo 2 camisetas e 1 calça.
-
-**1. Registrar a venda:**
-
-```sql
-INSERT INTO vendas (id_cliente, data_venda, valor_total, status)
-VALUES (1, NOW(), 180.00, 'finalizada');
--- Trigger trg_vendas_insert é acionada automaticamente
-```
-
-**2. Registrar os itens da venda:**
-
-```sql
-INSERT INTO itens_venda (id_venda, id_produto, quantidade, preco_unitario)
-VALUES (10, 1, 2, 50.00); -- camiseta
-
-INSERT INTO itens_venda (id_venda, id_produto, quantidade, preco_unitario)
-VALUES (10, 2, 1, 80.00); -- calça
-```
-
-**3. Atualizar o estoque:**
-
-```sql
-UPDATE produtos SET estoque = estoque - 2 WHERE id_produto = 1; -- camiseta
-UPDATE produtos SET estoque = estoque - 1 WHERE id_produto = 2; -- calça
--- Trigger trg_produtos_update registra as alterações
-```
-
-**4. Consultar a venda:**
-
-```sql
-SELECT * FROM vw_vendas_clientes WHERE id_venda = 10;
-```
-
-**5. Consultar o histórico de auditoria:**
-
-```sql
-SELECT * FROM auditoria ORDER BY data_operacao DESC;
+SELECT * FROM vw_clientes_ativos;
+SELECT * FROM vw_produtos_disponiveis;
+SELECT * FROM vw_vendas_clientes;
+SELECT * FROM vw_itens_venda_detalhada;
+SELECT * FROM vw_auditoria_resumida;
 ```
 
 ---
 
 ## Testes Realizados
 
-Foram realizados testes práticos para validar o funcionamento das Triggers e garantir o registro correto das operações.
-
-### Teste 1 — Cadastro de Cliente (INSERT)
+### Tabela `clientes`
 
 ```sql
+-- Inserir
 INSERT INTO clientes (nome, cpf, email, telefone, status)
 VALUES ('Danilo', '123.456.789-00', 'danilo@email.com', '99999-9999', 'ativo');
-```
 
- `trg_clientes_insert` acionada — dados registrados em `valor_novo` na tabela `auditoria`.
+INSERT INTO clientes (nome, cpf, email, telefone, status)
+VALUES ('Mariah', '123.456.789-00', 'mariah@email.com', '99999-9999', 'ativo');
 
----
+-- Atualizar
+UPDATE clientes SET nome = 'Danilo Henrique' WHERE id_cliente = 1;
 
-### Teste 2 — Atualização de Cliente (UPDATE)
-
-```sql
-UPDATE clientes
-SET nome = 'Danilo Henrique'
-WHERE id_cliente = 1;
-```
-
- `trg_clientes_update` registrou corretamente:
-- `valor_antigo`: `{"nome": "Danilo"}`
-- `valor_novo`: `{"nome": "Danilo Henrique"}`
-
----
-
-### Teste 3 — Exclusão de Cliente (DELETE)
-
-```sql
+-- Excluir
 DELETE FROM clientes WHERE id_cliente = 1;
+
+-- Verificar
+SELECT * FROM clientes;
 ```
 
- `trg_clientes_delete` armazenou os dados antigos antes da remoção.
+ Triggers acionadas: `trg_clientes_insert`, `trg_clientes_update`, `trg_clientes_delete`
 
----
-
-### Teste 4 — Cadastro de Produto (INSERT)
+### Tabela `produtos`
 
 ```sql
+-- Inserir
 INSERT INTO produtos (nome, descricao, preco, estoque, status)
-VALUES ('Camiseta', 'Camiseta preta', 50.00, 20, 'ativo');
+VALUES ('Camiseta', 'Camiseta preta', 50.00, 18, 'ativo');
+
+INSERT INTO produtos (nome, descricao, preco, estoque, status)
+VALUES ('Short', 'Short preto', 40.00, 20, 'ativo');
+
+-- Atualizar estoque e preço
+UPDATE produtos SET estoque = 18, preco = 35.00 WHERE id_produto = 2;
+
+-- Verificar
+SELECT * FROM produtos;
 ```
 
- Produto inserido corretamente e disponível para vendas.
+ Triggers acionadas: `trg_produtos_insert`, `trg_produtos_update`
 
----
-
-### Teste 5 — Atualização de Estoque (UPDATE)
-
-```sql
-UPDATE produtos SET estoque = 18 WHERE id_produto = 1;
-```
-
- `trg_produtos_update` registrou os valores antigos e novos do estoque.
-
----
-
-### Validação Final
+### Validação da Auditoria
 
 ```sql
 SELECT * FROM auditoria ORDER BY data_operacao DESC;
 ```
 
-Todas as operações foram registradas corretamente, validando o funcionamento do sistema de auditoria.
+---
+
+## Exemplo de Uso Completo
+
+Cenário: cliente **Mariah** (`id_cliente = 2`) realiza uma compra de 2 camisetas e 1 short.
+
+>  **Importante:** respeite a ordem abaixo por conta das chaves estrangeiras. Sempre verifique o ID real gerado com `SELECT * FROM vendas` antes de inserir os itens.
+
+### 1. Registrar a venda
+
+```sql
+INSERT INTO vendas (id_cliente, data_venda, valor_total, status)
+VALUES (2, NOW(), 180.00, 'finalizada');
+-- Trigger trg_vendas_insert é acionada automaticamente
+```
+
+### 2. Verificar o ID gerado
+
+```sql
+SELECT * FROM vendas;
+-- Anote o id_venda antes de continuar
+```
+
+### 3. Registrar os itens
+
+```sql
+-- Use o id_venda real retornado acima
+INSERT INTO itens_venda (id_venda, id_produto, quantidade, preco_unitario)
+VALUES (1, 1, 2, 50.00); -- camiseta
+
+INSERT INTO itens_venda (id_venda, id_produto, quantidade, preco_unitario)
+VALUES (1, 2, 1, 35.00); -- short
+```
+
+### 4. Atualizar o estoque
+
+```sql
+UPDATE produtos SET estoque = estoque - 2 WHERE id_produto = 1; -- camiseta
+UPDATE produtos SET estoque = estoque - 1 WHERE id_produto = 2; -- short
+-- Trigger trg_produtos_update registra as alterações
+```
+
+### 5. Consultar os resultados
+
+```sql
+SELECT * FROM vw_vendas_clientes WHERE id_venda = 1;
+SELECT * FROM itens_venda;
+SELECT * FROM produtos;
+SELECT * FROM auditoria ORDER BY data_operacao DESC;
+```
 
 ---
 
@@ -450,44 +397,30 @@ Todas as operações foram registradas corretamente, validando o funcionamento d
 mysql -u root -p
 ```
 
-Informe a senha do usuário MySQL quando solicitado.
-
-### Passo 2 — Executar o Script SQL
+### Passo 2 — Executar o Script
 
 ```sql
-SOURCE bd_auditoria.sql;
+SOURCE bd_auditoria_mvp.sql;
 ```
 
-Caso o arquivo esteja em outra pasta:
+Ou pelo caminho completo:
 
 ```sql
-SOURCE C:/Users/Usuario/Downloads/bd_auditoria.sql;
+SOURCE C:/Users/Usuario/Downloads/bd_auditoria_mvp.sql;
 ```
 
-> **Pelo MySQL Workbench:** Abra a conexão local → Abra o arquivo `bd_auditoria.sql` → Clique em **Execute**.
+> **Pelo MySQL Workbench:** Abra a conexão → Abra o arquivo `bd_auditoria_mvp.sql` → Clique em **Execute**.
 
 Após a execução, o banco `bd_auditoria` será criado automaticamente com todas as tabelas, Triggers e Views.
 
-### Passo 3 — Testar o Sistema
+### Consultas rápidas
 
 ```sql
--- Inserir um cliente
-INSERT INTO clientes (nome, cpf, email, telefone, status)
-VALUES ('Danilo', '123.456.789-00', 'danilo@email.com', '99999-9999', 'ativo');
-
--- Atualizar dados
-UPDATE clientes SET nome = 'Danilo Henrique' WHERE id_cliente = 1;
-
--- Excluir registro
-DELETE FROM clientes WHERE id_cliente = 1;
-
--- Consultar auditoria
+SELECT * FROM clientes;
+SELECT * FROM produtos;
+SELECT * FROM vendas;
+SELECT * FROM itens_venda;
 SELECT * FROM auditoria ORDER BY data_operacao DESC;
-
--- Consultar views
-SELECT * FROM vw_vendas_clientes;
-SELECT * FROM vw_clientes_ativos;
-SELECT * FROM vw_produtos_disponiveis;
 ```
 
 ---
