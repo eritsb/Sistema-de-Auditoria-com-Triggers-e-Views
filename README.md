@@ -42,9 +42,7 @@ Em ambientes que exigem controle rigoroso sobre os dados — como sistemas finan
 -  Garantir conformidade com normas e regulamentações (LGPD, por exemplo)
 -  Investigar incidentes de segurança ou erros operacionais
 -  Manter um histórico confiável de todas as transações realizadas
-- <img width="600" height="380" alt="Diagrama ER" src="https://github.com/user-attachments/assets/6c508f82-0543-4e75-a75b-4dca67bd310e" />
-<img width="600" height="380" alt="Diagrama ER" src="https://github.com/user-attachments/assets/903d3c08-ba8a-4fba-abdc-dcce3f82c05c" />
-<img width="600" height="380" alt="Diagrama ER" src="https://github.com/user-attachments/assets/e3f2eb12-6762-4794-b634-7a6882b65b6b" />
+
  Facilitar auditorias externas e relatórios de gestão
 
 ### Recursos Aplicados
@@ -59,7 +57,7 @@ Em ambientes que exigem controle rigoroso sobre os dados — como sistemas finan
 ## Diagrama ER
 
 O banco de dados `bd_auditoria` é composto por **cinco tabelas principais**, conforme o diagrama abaixo:
-
+<img width="600" height="380" alt="Diagrama ER" src="https://github.com/user-attachments/assets/903d3c08-ba8a-4fba-abdc-dcce3f82c05c" />
 ```
 clientes ──(1:N)──> vendas ──(1:N)──> itens_venda <──(1:N)── produtos
                                             │
